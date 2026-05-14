@@ -22,6 +22,19 @@ def _first_error_message(serializer):
     return list(serializer.errors.values())[0][0]
 
 
+def get_tokens_for_user(user):
+    refresh = RefreshToken.for_user(user)
+    refresh['email'] = user.email
+    refresh['full_name'] = user.full_name
+    refresh['age'] = user.age if user.age else None
+    refresh['father_name'] = user.father_name if user.father_name else None
+
+    return {
+        'access': str(refresh.access_token),
+        'refresh': str(refresh),
+    }
+
+
 class CustomTokenAuthentication(BaseAuthentication):
     def authenticate(self, request):
         raw = request.META.get('HTTP_AUTHORIZATION', '').strip()
@@ -90,10 +103,10 @@ class LoginView(APIView):
         if not user:
             return api_response("error", "Invalid email or password.", http_status=401)
 
-        refresh = RefreshToken.for_user(user)
+        tokens = get_tokens_for_user(user)
         return api_response("success", "Login successful.", {
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
+            "access": tokens['access'],
+            "refresh": tokens['refresh'],
             "user": UserSerializer(user).data
         })
 
