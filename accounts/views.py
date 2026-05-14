@@ -26,7 +26,6 @@ class CustomTokenAuthentication(BaseAuthentication):
     def authenticate(self, request):
         raw = request.META.get('HTTP_AUTHORIZATION', '').strip()
         raw = raw.strip('"')
-        print("RAW HEADER:", raw)
         if not raw:
             return None
 
@@ -38,23 +37,18 @@ class CustomTokenAuthentication(BaseAuthentication):
             else:
                 token_string = raw
 
-            print("TOKEN STRING:", token_string[:20])
             token_string = token_string.strip('"')
             validated = AccessToken(token_string)
-            print("VALIDATED USER ID:", validated['user_id'])
             user_id = validated['user_id']
             user = User.objects.get(id=int(user_id))
-            print("USER FOUND:", user.email)
             return (user, validated)
         except User.DoesNotExist:
-            print("USER NOT FOUND")
             raise AuthenticationFailed('User not found.')
         except (TokenError, Exception) as e:
-            print("TOKEN ERROR:", str(e))
             raise AuthenticationFailed('Invalid or expired token.')
 
 
-# CORRECT ✅
+
 class UpdateProfileSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(required=False)
     age = serializers.IntegerField(required=False)
@@ -65,7 +59,7 @@ class UpdateProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = ['full_name', 'age', 'father_name', 'profile_image']
 
-        
+
 class SignupView(APIView):
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
