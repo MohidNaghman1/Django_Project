@@ -1,7 +1,12 @@
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
+from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import authenticate
 from drf_yasg.utils import swagger_auto_schema
 from .models import User, PasswordResetToken
@@ -9,16 +14,61 @@ from .serializers import (
     SignupSerializer, LoginSerializer,
     ForgotPasswordSerializer, ResetPasswordSerializer, UserSerializer
 )
-from .utils import api_response, send_welcome_email, send_reset_email
+from .utils import send_welcome_email, send_reset_email
+from server.utils import api_response
 
 
 def _first_error_message(serializer):
     return list(serializer.errors.values())[0][0]
 
 
+class CustomTokenAuthentication(BaseAuthentication):
+    def authenticate(self, request):
+        raw = request.META.get('HTTP_AUTHORIZATION', '').strip()
+        raw = raw.strip('"')
+        print("RAW HEADER:", raw)
+        if not raw:
+            return None
+
+        try:
+            if raw.startswith('Bearer '):
+                token_string = raw[len('Bearer '):].strip()
+            elif raw.startswith('Token '):
+                token_string = raw[len('Token '):].strip()
+            else:
+                token_string = raw
+
+            print("TOKEN STRING:", token_string[:20])
+            token_string = token_string.strip('"')
+            validated = AccessToken(token_string)
+            print("VALIDATED USER ID:", validated['user_id'])
+            user_id = validated['user_id']
+            user = User.objects.get(id=int(user_id))
+            print("USER FOUND:", user.email)
+            return (user, validated)
+        except User.DoesNotExist:
+            print("USER NOT FOUND")
+            raise AuthenticationFailed('User not found.')
+        except (TokenError, Exception) as e:
+            print("TOKEN ERROR:", str(e))
+            raise AuthenticationFailed('Invalid or expired token.')
+
+
+# CORRECT ✅
+class UpdateProfileSerializer(serializers.ModelSerializer):
+    full_name = serializers.CharField(required=False)
+    age = serializers.IntegerField(required=False)
+    father_name = serializers.CharField(required=False)
+    profile_image = serializers.ImageField(required=False)
+
+    class Meta:
+        model = User
+        fields = ['full_name', 'age', 'father_name', 'profile_image']
+
+        
 class SignupView(APIView):
     permission_classes = [AllowAny]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     @swagger_auto_schema(request_body=SignupSerializer)
     def post(self, request):
@@ -33,7 +83,7 @@ class SignupView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
-    parser_classes = [FormParser]
+    parser_classes = [FormParser, JSONParser, MultiPartParser]
 
     @swagger_auto_schema(request_body=LoginSerializer)
     def post(self, request):
@@ -56,7 +106,7 @@ class LoginView(APIView):
 
 class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
-    parser_classes = [FormParser]
+    parser_classes = [FormParser, JSONParser, MultiPartParser]
 
     @swagger_auto_schema(request_body=ForgotPasswordSerializer)
     def post(self, request):
@@ -77,7 +127,7 @@ class ForgotPasswordView(APIView):
 
 class ResetPasswordView(APIView):
     permission_classes = [AllowAny]
-    parser_classes = [FormParser]
+    parser_classes = [FormParser, JSONParser, MultiPartParser]
 
     @swagger_auto_schema(request_body=ResetPasswordSerializer)
     def post(self, request):
@@ -97,3 +147,26 @@ class ResetPasswordView(APIView):
         reset.is_used = True
         reset.save()
         return api_response("success", "Password reset successfully.")
+
+
+class GetProfileView(APIView):
+    authentication_classes = [CustomTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return api_response("success", "Profile fetched successfully.", UserSerializer(request.user).data)
+
+
+class UpdateProfileView(APIView):
+    authentication_classes = [CustomTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    @swagger_auto_schema(request_body=UpdateProfileSerializer)
+    def patch(self, request):
+        serializer = UpdateProfileSerializer(request.user, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return api_response("error", _first_error_message(serializer), http_status=400)
+
+        updated_user = serializer.save()
+        return api_response("success", "Profile updated successfully.", UserSerializer(updated_user).data)

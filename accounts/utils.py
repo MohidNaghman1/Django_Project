@@ -1,18 +1,9 @@
 import logging
 
 from django.core.mail import send_mail
-from rest_framework.response import Response
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
-
-
-def api_response(status, message, data=None, http_status=200):
-    return Response({
-        "status": status,
-        "message": message,
-        "data": data
-    }, status=http_status)
 
 
 def send_welcome_email(user_email, full_name):

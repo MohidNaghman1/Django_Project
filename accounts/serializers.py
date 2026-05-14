@@ -7,7 +7,7 @@ class SignupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['email', 'full_name', 'password', 'profile_image']
+        fields = ['email', 'full_name', 'age', 'father_name', 'password', 'profile_image']
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
@@ -25,7 +25,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'full_name', 'profile_image', 'created_at', 'wallet_balance']
+        fields = ['id', 'email', 'full_name', 'age', 'father_name', 'profile_image', 'created_at', 'wallet_balance']
 
     def get_wallet_balance(self, obj):
         try:
