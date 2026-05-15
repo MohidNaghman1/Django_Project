@@ -13,6 +13,7 @@ db.sqlite3
 *.sqlite3
 staticfiles/
 media/
+server.log
 
 # Test / coverage / type-check caches
 .pytest_cache/
