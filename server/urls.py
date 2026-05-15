@@ -29,8 +29,7 @@ schema_view = get_schema_view(
         description="Production API Docs",
     ),
     public=True,
-    permission_classes=[permissions.AllowAny],
-    authentication_classes=[],
+    permission_classes=[permissions.AllowAny]
 )
 
 urlpatterns = [

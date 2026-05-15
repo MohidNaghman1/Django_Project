@@ -1,3 +1,5 @@
+import os
+
 from rest_framework.views import APIView
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
@@ -174,6 +176,16 @@ class UpdateProfileView(APIView):
         serializer = UpdateProfileSerializer(request.user, data=request.data, partial=True)
         if not serializer.is_valid():
             return api_response("error", _first_error_message(serializer), http_status=400)
+
+        if 'profile_image' in request.data:
+            try:
+                old_image = request.user.profile_image
+                if old_image and old_image.name:
+                    old_image_path = old_image.path
+                    if os.path.isfile(old_image_path):
+                        os.remove(old_image_path)
+            except Exception:
+                pass
 
         updated_user = serializer.save()
         return api_response("success", "Profile updated successfully.", UserSerializer(updated_user).data)
